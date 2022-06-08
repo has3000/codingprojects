@@ -1,0 +1,123 @@
+Attribute VB_Name = "Module1"
+Sub SaveAsV5Dir()
+    On Error GoTo ErrorHandler
+    
+    Dim PathFileName As String, PathName As String, CurrFileName As String, _
+        FullFileName As String, NewPathName As String, PDFFileName As String, _
+        file_list() As String, file_indx As Integer, file_count As Integer, _
+        folder_list() As String, folder_indx As Integer, folder_count As Integer, _
+        CurrFolderName As String, FullFolderName As String, _
+        AppVisio As Visio.Application, DocObj As Object, vis As Object, _
+        Break As Integer, VisCheck, FolderCheck As String, Count
+    
+    On Error GoTo CreateVisio
+    Set vis = GetObject(, "Visio.Application")          'If Visio is open, selects it. Else, creates new instance
+    
+    ' Set the starting and ending pathnames
+    PathName = "F:\MESHARE\VisioToPDF VBA Code\[Visio Folder Name]\"
+    PathFileName = PathName & "*.vsdx"
+    NewPathName = "F:\MESHARE\VisioToPDF VBA Code\[PDF Folder Name]\"
+        
+    'Index folders within base folder
+    folder_count = 0
+    ReDim folder_list(0) As String
+    CurrFolderName = Dir(PathName, vbDirectory)
+    
+    Do While CurrFolderName <> ""
+        If folder_list(UBound(folder_list)) <> "" Then ReDim Preserve folder_list(UBound(folder_list) + 1)
+        folder_list(UBound(folder_list)) = CurrFolderName
+        CurrFolderName = Dir
+    Loop
+        
+    Count = 0
+        
+    For folder_indx = 2 To UBound(folder_list)      'Not sure why the first two folders are "." and ".." but
+                                                    'this gets around that
+        CurrFolderName = folder_list(folder_indx)
+        FolderCheck = Dir(NewPathName & CurrFolderName, vbDirectory)
+        If FolderCheck = "" Then
+            MkDir (NewPathName & CurrFolderName)
+        End If
+                
+    'Index all files within the folder
+        CurrFileName = ""
+        file_count = 0
+        ReDim file_list(0) As String
+        FullFolderName = PathName & folder_list(folder_indx) & "\"
+        CurrFileName = Dir(FullFolderName)
+    
+        Do While CurrFileName <> ""
+            If file_list(UBound(file_list)) <> "" Then ReDim Preserve file_list(UBound(file_list) + 1)
+            file_list(UBound(file_list)) = CurrFileName
+            CurrFileName = Dir
+        Loop
+    
+            Start = Timer               'slight pause for breathing room
+            Wait = 2
+            Debug.Print "Waiting..."
+    
+            Do While Timer < Start + Wait
+                Loop
+        For file_indx = 0 To UBound(file_list)
+            CurrFileName = file_list(file_indx)
+            Debug.Print file_indx & ": " & CurrFileName
+        
+            FullFileName = FullFolderName & CurrFileName
+            Debug.Print "Visio: " & FullFileName
+        
+            On Error GoTo CreateVisio    'If Visio is open, selects it. Else, creates new instance
+            Set vis = GetObject(, "Visio.Application")
+            On Error GoTo ErrorHandler
+            Set AppVisio = GetObject(, "Visio.Application")
+            Set DocObj = AppVisio.Documents.Open(FullFileName)
+                              
+            PDFFileName = NewPathName & CurrFolderName & "\" & Left(CurrFileName, Len(CurrFileName) - 5) & ".pdf"
+            Debug.Print "PDF: " & PDFFileName
+            
+            'Save as PDF in new folder, then close visio instance
+            AppVisio.ActiveDocument.ExportAsFixedFormat visFixedFormatPDF, PDFFileName, visDocExIntentPrint, visPrintAll
+            DocObj.Close
+            Set DocObj = Nothing
+            
+            'Pause when getting close to the previous failure point
+            If Count > errcount * 0.9 Then
+                AppVisio.Quit
+                Start = Timer
+                    Wait = 2
+                    Debug.Print "Waiting..."
+                        Do While Timer < Start + Wait
+                        Loop
+                End If
+                
+            Debug.Print 'Line break
+
+            Count = Count + 1
+            Debug.Print Count
+        Next file_indx
+        
+        AppVisio.Quit
+        Start = Timer
+            Wait = 2
+            Debug.Print "Waiting..."
+    
+            Do While Timer < Start + Wait
+                Loop
+    Next folder_indx
+
+On Error GoTo 0
+
+Debug.Print "Finished!"
+
+Exit Sub
+ErrorHandler:
+    Debug.Print Err.Description
+    errcount = Count
+    Count = 0
+    Resume Next
+CreateVisio:
+    Debug.Print Err.Description
+    Set vis = CreateObject("Visio.Application")
+    Set vis = GetObject(, "Visio.Application")
+    On Error GoTo ErrorHandler
+    Resume Next
+End Sub
